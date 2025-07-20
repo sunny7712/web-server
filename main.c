@@ -24,10 +24,20 @@ char* extract_path(char *buffer) {
 	return substr;
 }
 
+void read_file(const char* path, char* buf, size_t buf_len, size_t buffer_start_idx){ // read entire (TODO: will need to change that to a streaming approach later) file into the buffer 
+	FILE* fp = fopen(path, "r");
+	if(fp == NULL){
+		printf("Error opening file: %s", strerror(errno));
+	}
+	size_t size = fread(buf + buffer_start_idx, 1, buf_len - 1, fp); // 1 byte is for each char
+}
+
 int main() {
 	// Disable output buffering
 	setbuf(stdout, NULL);
  	setbuf(stderr, NULL);
+
+	const char* INDEX_HTML_FILE_PATH = "www/index.html";
 
 	int server_fd, client_addr_len;
 	struct sockaddr_in client_addr;
@@ -71,12 +81,20 @@ int main() {
 	size_t size = read(client_fd, buffer, sizeof(buffer) - 1); // leaving one byte for null termination
 	char* requested_path = extract_path(buffer);
 
-	char message[1024] = "HTTP/1.1 200 OK\r\n\r\nRequested path: ";
-	int fixed_message_len = strlen(message);
-	strncpy(message + fixed_message_len, requested_path, strlen(requested_path));
-	if(send(client_fd, message, strlen(message), 0) == -1){
-		printf("Send failed: %s \n", strerror(errno));
-		return 1;
+	if(strcmp(requested_path, "/") == 0 || strcmp(requested_path, "/index.html") == 0){
+		char message[4096] = "HTTP/1.1 200 OK\r\n\r\n";
+		read_file(INDEX_HTML_FILE_PATH, message, sizeof(message), strlen(message));
+		if(send(client_fd, message, strlen(message), 0) == -1){
+			printf("Send failed: %s \n", strerror(errno));
+			return 1;
+		}
+	}
+	else{
+		char message[] = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
+		if(send(client_fd, message, strlen(message), 0) == -1){
+			printf("Send failed: %s \n", strerror(errno));
+			return 1;
+		}
 	}
 	close(server_fd);
 	close(client_fd);
